@@ -1,55 +1,91 @@
 package com.yousef.sharedpref;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-
-import com.google.android.material.chip.Chip;
 
 public class MainActivity extends AppCompatActivity {
-EditText eTName, eTEmail;
-Button button, buttonNextpage;
-SharedPreferences sp;
-String name, email;
-Boolean ReceiveUpdates;
-Chip chip;
+
+    EditText eTName, eTEmail;
+    Button button, buttonNextpage;
+    String name, email;
+    Boolean ReceiveUpdates;
+    CheckBox chip, rememeberCheckbox;
+
+    UserPreferences userPreferences;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        userPreferences = new UserPreferences(this);
+
+        // ✅ Auto redirect if already logged in
+        if (userPreferences.isLoggedIn()) {
+            startActivity(new Intent(MainActivity.this, SecondActivity.class));
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_main);
         initComponents();
-        sp=getSharedPreferences("MyUserPrefs",MODE_PRIVATE);
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-        name=eTName.getText().toString();
-        email=eTEmail.getText().toString();
-        if (chip.isChecked()){ReceiveUpdates=true;}
-        else {ReceiveUpdates=false;}
-        SharedPreferences.Editor editor=sp.edit();
-        editor.putString("name",name);
-        editor.putString("email",email);
-        editor.putBoolean("ReceiveUpdates",ReceiveUpdates);
-        editor.commit();
-                Toast.makeText(MainActivity.this, "Info saved", Toast.LENGTH_SHORT).show();
+
+        button.setOnClickListener(v -> {
+
+            name = eTName.getText().toString();
+            email = eTEmail.getText().toString();
+            ReceiveUpdates = chip.isChecked();
+
+            // ❌ Empty validation (important)
+            if (email.isEmpty() || name.isEmpty()) {
+                Toast.makeText(this, "Fill all fields", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            // 🔹 If user doesn't exist → register
+            if (!userPreferences.isUserRegistered()) {
+
+                userPreferences.register(name, email, ReceiveUpdates);
+                Toast.makeText(this, "Registered successfully", Toast.LENGTH_SHORT).show();
+
+            } else {
+
+                // 🔹 login
+                boolean success = userPreferences.login(name,email);
+
+                if (!success) {
+                    Toast.makeText(this, "One of the details is wrong", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show();
+            }
+
+            // 🔹 Remember me logic (IMPORTANT FIX)
+            if (rememeberCheckbox.isChecked()) {
+                // keep logged in (do nothing)
+            } else {
+                userPreferences.logout();
+            }
+
+            // 🔹 Go to second activity
+            startActivity(new Intent(MainActivity.this, SecondActivity.class));
+            finish();
         });
-        buttonNextpage.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent=new Intent(MainActivity.this,SecondActivity.class);
-                startActivity(intent);
+
+        buttonNextpage.setOnClickListener(v -> {
+
+            if (userPreferences.isLoggedIn()) {
+                startActivity(new Intent(MainActivity.this, SecondActivity.class));
+            } else {
+                Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show();
             }
+
         });
     }
 
@@ -59,6 +95,6 @@ Chip chip;
         button = findViewById(R.id.button);
         buttonNextpage = findViewById(R.id.buttonNextpage);
         chip = findViewById(R.id.chip);
-
+        rememeberCheckbox = findViewById(R.id.RememberCheckbox);
     }
 }
